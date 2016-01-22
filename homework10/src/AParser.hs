@@ -58,12 +58,10 @@ posInt = Parser f
 
 instance Functor Parser where
   fmap :: (a -> b) -> Parser a -> Parser b
-  fmap = undefined
+  fmap f p = Parser $ fmap (first f) . runParser p
 
-
-first :: (a -> b) -> (a, c) -> (b, c)
-first = undefined
-
+first :: (a -> b) -> (a,c) -> (b,c)
+first f (x, y) = (f x, y)
 
 ----------------------------------------------------------------------
 -- Exercise 2
@@ -71,10 +69,26 @@ first = undefined
 
 instance Applicative Parser where
   pure :: a -> Parser a
-  pure = undefined
+  pure a = Parser $ \s -> Just (a, s)
+  
+  -- (<*>) :: Parser (a -> b) -> Parser a -> Parser b
+  -- (<*>) (Parser f) (Parser a) = Parser $
+  --   \s -> case f s of
+  --     Nothing -> Nothing
+  --     Just (f1, rest) -> fmap (first f1) (a rest)
 
+  -- fmap :: (a -> b) -> f a -> f b
+  -- transform :: (String -> Maybe (a, String)) -> Maybe(a -> b, String) -> Maybe(b, String)
+  -- x :: String -> Maybe (a , String)
+  -- f :: String -> Maybe (a -> b, String)
+  
   (<*>) :: Parser (a -> b) -> Parser a -> Parser b
-  (<*>) = undefined
+  (<*>) (Parser f) (Parser x) = Parser $ fmap (transform x)  f
+    where
+      transform :: (String -> Maybe (a, String)) -> Maybe(a -> b, String) -> Maybe(b, String)
+      transform _ Nothing             = Nothing
+      transform toMaybe (Just (g, s)) = fmap (\(y, str ) -> (g y, str)) (toMaybe s)
+        
 
 
 ----------------------------------------------------------------------
@@ -89,7 +103,7 @@ instance Applicative Parser where
 -- Nothing
 
 abParser :: Parser (Char, Char)
-abParser = undefined
+abParser =  ( , )<$> char 'a' <*> char 'b'
 
 
 -- |
@@ -100,7 +114,8 @@ abParser = undefined
 -- Nothing
 
 abParser_ :: Parser ()
-abParser_ = undefined
+-- (<$) :: Functor f => a -> f b -> f a
+abParser_ = () <$ abParser
 
 
 -- |
@@ -109,7 +124,11 @@ abParser_ = undefined
 -- Just ([12,34],"")
 
 intPair :: Parser [Integer]
-intPair = undefined
+-- (<*) :: Applicative f => f a -> f b -> f a
+-- runParser (posInt <* char ' ') "5 yy"
+intPair =  couple <$> posInt <* char ' ' <*> posInt
+  where
+    couple x y = [x, y]
 
 
 ----------------------------------------------------------------------
@@ -118,10 +137,10 @@ intPair = undefined
 
 instance Alternative Parser where
   empty :: Parser a
-  empty = undefined
+  empty = Parser $  const Nothing
 
   (<|>) :: Parser a -> Parser a -> Parser a
-  (<|>) = undefined
+  (<|>) p1 p2 = Parser (\s -> runParser p1 s <|> runParser p2 s )
 
 
 ----------------------------------------------------------------------
@@ -138,4 +157,4 @@ instance Alternative Parser where
 -- Nothing
 
 intOrUppercase :: Parser ()
-intOrUppercase = undefined
+intOrUppercase = () <$ posInt <|> () <$ satisfy isUpper
