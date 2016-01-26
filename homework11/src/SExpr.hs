@@ -26,7 +26,8 @@ import Data.Char
 -- Just ("","abcdeFGh")
 
 zeroOrMore :: Parser a -> Parser [a]
-zeroOrMore = undefined
+-- many
+zeroOrMore  x  = oneOrMore x  <|> pure []
 
 
 -- |
@@ -37,7 +38,8 @@ zeroOrMore = undefined
 -- Nothing
 
 oneOrMore :: Parser a -> Parser [a]
-oneOrMore = undefined
+-- some
+oneOrMore x = (:) <$> x <*> zeroOrMore x
 
 
 ----------------------------------------------------------------------
@@ -45,7 +47,7 @@ oneOrMore = undefined
 ----------------------------------------------------------------------
 
 spaces :: Parser String
-spaces = undefined
+spaces = zeroOrMore (satisfy isSpace)
 
 
 -- |
@@ -60,7 +62,7 @@ spaces = undefined
 -- Nothing
 
 ident :: Parser String
-ident = undefined
+ident = (++) <$> oneOrMore (satisfy isAlpha) <*> zeroOrMore (satisfy isAlphaNum)
 
 
 ----------------------------------------------------------------------
@@ -97,4 +99,27 @@ data SExpr
 -- Nothing
 
 parseSExpr :: Parser SExpr
-parseSExpr = undefined
+parseSExpr = (A <$> parseAtom) <|> (Comb <$> parseSExprCollection)
+
+parseAtom :: Parser Atom
+parseAtom =  spaces *> ((N <$> posInt) <|> (I <$> ident) ) <* spaces
+
+parseSExprCollection :: Parser [SExpr]
+parseSExprCollection = parseLParent *> zeroOrMore parseSExpr <*  parseRParent
+
+parseLParent :: Parser Char
+parseLParent = spaces *> getCharParser '(' <* spaces
+
+parseRParent :: Parser Char
+parseRParent = spaces *> getCharParser ')' <* spaces
+
+getCharParser :: Char -> Parser Char
+getCharParser = char
+
+
+-- |
+-- Totally unrelated with the homework but with monad yes..lol
+
+applyMaybe :: Maybe a -> (a -> Maybe b) -> Maybe b
+applyMaybe Nothing _ = Nothing
+applyMaybe (Just x) f = f x
