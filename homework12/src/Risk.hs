@@ -3,6 +3,8 @@
 module Risk where
 
 import Control.Monad.Random
+import Control.Monad
+import Data.List
 
 ------------------------------------------------------------
 -- Die values
@@ -41,7 +43,20 @@ data Battlefield =
 ----------------------------------------------------------------------
 
 battle :: Battlefield -> Rand StdGen Battlefield
-battle = undefined
+battle b@(Battlefield a d) = do
+       aDiceM <- replicateM (min 3 (a-1)) die
+       dDiceM <- replicateM (min 2 d) die
+       return $ outcome  b (fmap unDV  aDiceM) (fmap unDV dDiceM)
+
+outcome :: Battlefield -> [Int] -> [Int] -> Battlefield
+outcome (Battlefield a d) aDice dDice =  Battlefield (a - aDeads) ( d - dDeads )
+        where
+              results = zip (sort aDice) (sort dDice)
+              aDeads =  foldr (\(x, y) acc -> if x > y
+                                                 then acc + 1
+                                                 else acc) 0 results
+              dDeads = length results  - aDeads
+
 
 
 ----------------------------------------------------------------------
@@ -49,7 +64,12 @@ battle = undefined
 ----------------------------------------------------------------------
 
 invade :: Battlefield -> Rand StdGen Battlefield
-invade = undefined
+invade b = do
+       -- thanks to JC for pointing out in class
+       battleResult@ (Battlefield a d) <- battle b
+       if d > 0 || a > 1
+          then invade b
+          else return battleResult
 
 
 ----------------------------------------------------------------------
@@ -57,4 +77,8 @@ invade = undefined
 ----------------------------------------------------------------------
 
 successProb :: Battlefield -> Rand StdGen Double
-successProb = undefined
+successProb b = do
+            results <- replicateM 1000 $ invade b
+            return  (fromInteger  ( foldr (\(Battlefield _ d ) acc -> if d == 0
+                                                                         then acc + 1
+                                                                         else acc ) 0 results) / 1000.0)
